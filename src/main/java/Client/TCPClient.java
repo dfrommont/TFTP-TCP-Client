@@ -6,12 +6,11 @@ import java.util.Scanner;
 
 public class TCPClient {
 
-    private static final int MAX_PACKET_SIZE = 10000; // Maximum size of UDP packet
-    protected static Socket clientSocket = null;
+    private static final int MAX_SIZE = 512; //Max size of data that can be communicated
+    protected static Socket clientSocket = null; //Initialise client socket
 
-    protected static PrintWriter out = null;
-    protected static BufferedReader in = null;
-    protected static BufferedReader stdin = null;
+    protected static PrintWriter out = null; //Initialise socket output
+    protected static BufferedReader in = null; //Initialise socket input
 
     public static void main(String[] args) throws IOException {
 
@@ -25,82 +24,82 @@ public class TCPClient {
         int flag = Integer.parseInt(input.nextLine());
 
         try {
+            clientSocket = new Socket(); //Open the client socket
+            clientSocket.connect(new InetSocketAddress(InetAddress.getByName(name), 69)); //Connect socket to the machine's address and port number 69
 
-            // Server address and port
-            InetAddress inetAddress = InetAddress.getByName(name);
-            SocketAddress clientAddress = new InetSocketAddress(inetAddress, 1235);
+            clientSocket.setSoTimeout(30000); //Socket has a 30-second timeout on communication
 
-            // Create a UDP socket
-            clientSocket = new Socket();
-            clientSocket.connect(clientAddress);
-
-            //clientSocket.setSoTimeout(5000);
-
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            stdin = new BufferedReader(new InputStreamReader(System.in));
+            out = new PrintWriter(clientSocket.getOutputStream(), true); //Use a PrintWriter to access the outputStream of the socket
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); //Open the socket's inputStream within a BufferedReader
 
             if (flag == 1) {
-                // Request to retrieve a file by name
                 System.out.println("Enter the file name including it's extension:");
-                String file_name = input.nextLine();
-                receiveFile(clientSocket, in, file_name);
+                String fileName = input.nextLine(); //Retrieve file name from client
+                receiveFile(clientSocket, fileName); //Call method to handle a read request with format: 'GET fileName'
             }
 
             if (flag == 2) {
-                // Request to send a file to the server
                 System.out.println("Enter the file name including it's extension (File should be in the 'files' directory):");
-                String file_name = input.nextLine();
-                sendFile(clientSocket, out, file_name);
+                String fileName = input.nextLine();//Retrieve file name from client
+                sendFile(clientSocket, out, fileName, args);//Call method to handle a write request with format: 'PUT fileName'
             }
         } catch (Exception e) {
             e.printStackTrace();
             if (e instanceof SocketTimeoutException) {
-                clientSocket.close();
+                clientSocket.close(); //Close socket if communication has timed out
             }
         } finally {
             if (clientSocket != null) {
-                clientSocket.close();
+                clientSocket.close(); //Close the socket when communication is over if it hasn't already been closed
             }
         }
     }
 
-    private static void sendFile(Socket socket, PrintWriter out, String file_name) throws IOException {
-        try (FileInputStream fileInputStream = new FileInputStream("./files/" + file_name)) {
-            byte[] buffer = new byte[MAX_PACKET_SIZE];
-            int bytesRead;
-            OutputStream outputStream = socket.getOutputStream();
+    private static void sendFile(Socket socket, PrintWriter out, String fileName, String[] args) throws IOException {
+        try (FileInputStream fileInputStream = new FileInputStream("./files/" + fileName)) { //Open a FileInputStream for the desired file
+            byte[] bytesBuffer = new byte[MAX_SIZE];
+            int bytes;
+            OutputStream outputStream = socket.getOutputStream(); //Open the socket's outputStream
 
-            // Send file name
-            out.println(file_name);
+            out.println("PUT " + fileName); //Write 'PUT file name' request to Server
 
-            // Send file content
-            while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
+            while ((bytes = fileInputStream.read(bytesBuffer)) != -1) {
+                outputStream.write(bytesBuffer, 0, bytes); //Write the file data received from request to socket
             }
 
-            out.println("__END_OF_TRANSMISSION__");
+            out.println("END"); //Send end of communication tag to the server
 
-            outputStream.flush();
+            outputStream.flush(); //Push all the data to the socket and Server
 
-            System.out.println("File sent successfully.");
+            System.out.println("PUT " + fileName + " successful");
+        } catch (Exception e) {
+            if (e instanceof  FileNotFoundException) {
+                System.out.println(fileName + " could not be found");
+                main(args); //if desired file to send could not be found, restart the main method
+            }
+            e.printStackTrace();
         }
     }
 
-    private static void receiveFile(Socket socket, BufferedReader in, String file_name) throws IOException {
-        out.println("GET " + file_name);
 
-        try (FileOutputStream fileOutputStream = new FileOutputStream(file_name)) {
-            byte[] buffer = new byte[MAX_PACKET_SIZE];
-            int bytesRead;
-            InputStream inputStream = socket.getInputStream();
+    private static void receiveFile(Socket socket, String fileName) throws IOException {
+        out.println("GET " + fileName); //Send 'GET file name' to Server
 
-            // Receive file content
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                fileOutputStream.write(buffer, 0, bytesRead);
+        try (FileOutputStream fileOutputStream = new FileOutputStream("./files/" + fileName)) { //Open a fileOutputStream for the desired file in './files/'
+            byte[] bytesBuffer = new byte[MAX_SIZE];
+            int bytes;
+            InputStream inputStream = socket.getInputStream(); //Open the socket inputStream
+
+            while ((bytes = inputStream.read(bytesBuffer)) != -1) {
+                String receivedData = new String(bytesBuffer, 0, bytes);
+                if (receivedData.trim().equals("END")) {
+                    fileOutputStream.flush();
+                    break; //If the data received on the inputStream is the end of communication tag, stop writing to the file
+                }
+                fileOutputStream.write(bytesBuffer, 0, bytes); //Write the data received from the Server for the fileOutputStream
             }
-            fileOutputStream.flush();
-            System.out.println("File received successfully.");
+
+            System.out.println("GET " + fileName + " successful");
         }
     }
 }

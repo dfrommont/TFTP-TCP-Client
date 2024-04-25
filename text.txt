@@ -1,1 +1,2 @@
-blah blah text document content goes here
+__END_OF_TRANSMISSION__
+__END_OF_TRANSMISSION__
