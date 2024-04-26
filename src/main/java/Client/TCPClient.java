@@ -9,9 +9,6 @@ public class TCPClient {
     private static final int MAX_SIZE = 512; //Max size of data that can be communicated
     protected static Socket clientSocket = null; //Initialise client socket
 
-    protected static PrintWriter out = null; //Initialise socket output
-    protected static BufferedReader in = null; //Initialise socket input
-
     public static void main(String[] args) throws IOException {
 
         Scanner input = new Scanner(System.in);
@@ -29,17 +26,17 @@ public class TCPClient {
 
             clientSocket.setSoTimeout(30000); //Socket has a 30-second timeout on communication
 
-            out = new PrintWriter(clientSocket.getOutputStream(), true); //Use a PrintWriter to access the outputStream of the socket
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); //Open the socket's inputStream within a BufferedReader
+            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true); //Use a PrintWriter to access the outputStream of the socket
+            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); //Open the socket's inputStream within a BufferedReader
 
             if (flag == 1) {
                 System.out.println("Enter the file name including it's extension:");
                 String fileName = input.nextLine(); //Retrieve file name from client
-                receiveFile(clientSocket, fileName); //Call method to handle a read request with format: 'GET fileName'
+                receiveFile(clientSocket, out, fileName); //Call method to handle a read request with format: 'GET fileName'
             }
 
             if (flag == 2) {
-                System.out.println("Enter the file name including it's extension (File should be in the 'files' directory):");
+                System.out.println("Enter the file name including it's extension:");
                 String fileName = input.nextLine();//Retrieve file name from client
                 sendFile(clientSocket, out, fileName, args);//Call method to handle a write request with format: 'PUT fileName'
             }
@@ -56,7 +53,7 @@ public class TCPClient {
     }
 
     private static void sendFile(Socket socket, PrintWriter out, String fileName, String[] args) throws IOException {
-        try (FileInputStream fileInputStream = new FileInputStream("./files/" + fileName)) { //Open a FileInputStream for the desired file
+        try (FileInputStream fileInputStream = new FileInputStream("./src/main/java/Client/" + fileName)) { //Open a FileInputStream for the desired file
             byte[] bytesBuffer = new byte[MAX_SIZE];
             int bytes;
             OutputStream outputStream = socket.getOutputStream(); //Open the socket's outputStream
@@ -82,10 +79,10 @@ public class TCPClient {
     }
 
 
-    private static void receiveFile(Socket socket, String fileName) throws IOException {
+    private static void receiveFile(Socket socket, PrintWriter out, String fileName) throws IOException {
         out.println("GET " + fileName); //Send 'GET file name' to Server
 
-        try (FileOutputStream fileOutputStream = new FileOutputStream("./files/" + fileName)) { //Open a fileOutputStream for the desired file in './files/'
+        try (FileOutputStream fileOutputStream = new FileOutputStream("./src/main/java/Client/" + fileName)) { //Open a fileOutputStream for the desired file in './files/'
             byte[] bytesBuffer = new byte[MAX_SIZE];
             int bytes;
             InputStream inputStream = socket.getInputStream(); //Open the socket inputStream
